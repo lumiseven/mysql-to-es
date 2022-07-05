@@ -1,0 +1,14 @@
+dataSourceKey: defaultDS # 这里的key与上述application.yml中配置的数据源保持一致
+outerAdapterKey: esKey # 与上述application.yml中配置的outerAdapters.key一直
+destination: example # 默认为example,与application.yml中配置的instance保持一致
+groupId: g1
+esMapping:
+  _index: user_info
+  _type: _doc
+  _id: id
+  sql: "select t.id, t.login_name, t.nick_name, t.passwd, t.name, t.phone_num, t.email, t.head_img, t.user_level, t.birthday, t.gender, t.create_time, t.operate_time, t.status from user_info t"
+  # etlCondition: "where t.operate_time>={}"
+  # commitBatch: 3000 
+
+# id, login_name, nick_name, passwd, name, phone_num, email, head_img, user_level, birthday, gender, create_time, operate_time, status
+# select t.id, t.login_name, t.nick_name, t.passwd, t.name, t.phone_num, t.email, t.head_img, t.user_level, t.birthday, t.gender, t.create_time, t.operate_time, t.status from user_info t
