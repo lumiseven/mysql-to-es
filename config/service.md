@@ -14,3 +14,4 @@
 | mysql | &check; | | | |
 | es(master&data) | | &check; | &check; | &check; |
 | canal(deployer adapter admin) | | | &check; | |
+| maxwell | | | &check; | |

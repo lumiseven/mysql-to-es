@@ -14,7 +14,9 @@
 ### 1. 数据流向
 > 数据很明显是从 `mysql -> es` 这点毋庸置疑，但是需要思考的是，是否需要在其中引入 `MQ` 中间件的加入， `MQ` 会增加系统的复杂度，但同时带来系统的高扩展性 比如将增量的数据同时输出到多个下游系统
 
-![数据流向](./img/数据流向.png)
+<p align="center">
+    <img src="./img/数据流向.png" alt="数据流向"/>
+</p>
 
 ### 2. 同步策略
 同步策略是个重点的策略，从同步方式和实时性来看可以分为 `流处理实时同步` `批处理准实时同步` 两种同步模式 同时流处理和批处理是两个与业务关联性更高的话题，直接影响之后的整个同步系统的架构，在选择的时候需要结合业务考虑
@@ -23,7 +25,9 @@
     2. 业务考量： 实时的流处理是数据同步速度最快的方式，对数据的修改可以在很短的时间内直接反馈到结果上，数据的新增/修改 操作快 对业务的影响也就小
     3. 注意点： 数据库需要支持并开启 `binlog` 类似的数据同步/备份机制，索性几乎流行的 RDBMS 都有类似功能
 
-![mysql_binlog](./img/mysql_binlog.jpeg)
+<p align="center">
+    <img src="./img/mysql_binlog.jpeg" alt="mysql_binlog"/>
+</p>
 
 2. 批处理准实时同步: 
     1. 技术考量： 需要使用批处理操作获取最新的数据，简单的方案就是直接使用数据库查询语句(select)外加数据的新增修改时间戳字段(类似sql `select * from xxx where create_time>last_sync_time or update_time>last_sync_time`)，直接获取最新的数据，再增量同步到 目标数据库中
@@ -79,7 +83,9 @@ Canal 作为阿里开源的数据同步工具，基于 binlog 将数据库同步
 当前的 canal 支持源端 MySQL 版本包括 5.1.x , 5.5.x , 5.6.x , 5.7.x , 8.0.x
 官方简介: [canal-introduction](https://github.com/alibaba/canal/wiki/Introduction)
 
-![canal1](./img/canal1.png)
+<p align="center">
+    <img src="./img/canal1.png" alt="canal1"/>
+</p>
 
 这里我们使用 `1.1.6`(2022-05-24) release版本的 canal 执行下面的操作
 
@@ -99,7 +105,9 @@ canal 中各个组件的定义:
 
 既然使用 canal 作为数据传输工具 且 canal 有能力直接将数据放入es中，则考虑使用架构:
 
-![mysql-canal-es](./img/mysql-canal-es.png)
+<p align="center">
+    <img src="./img/mysql-canal-es.png" alt="mysql-canal-es"/>
+</p>
 
 ### 集群机器分配说明
 [service](./config/service.md)
@@ -156,11 +164,14 @@ canal-client-demo: https://code.aliyun.com/lumiseven/canal-t1.git
     6. es 的 adapter 当前似乎无法使用覆盖的方式提交数据，所以需要存在 全量同步+增量同步 两套方案
     <!-- 6. 总的来说 单单deployer 可以考虑使用，adapter不考虑使用 通过deployer将数据投递到kafka或许是canal的解决方案中唯一靠谱的 -->
 
-### canal -> kafka
+### 不使用 canal-adapter 转而仅使用 canal-deployer 完成数据从 mysql-binlog 到 kafka
 不使用 `canal-adapter` 转而通过 `canal-deployer` 将数据投递到 `kafka`
 减少配置以及不稳定性，提高了项目复杂度，但是相比 adapter 扩展性增强
 
-[mysql-canal-kafka](./img/mysql-canal-kafka.png)
+<p align="center">
+    <img src="./img/mysql-canal-kafka.png" alt="mysql-canal-kafka"/>
+</p>
+
 1. 修改 `canal-deployer` 配置
 ```properties
 ...
@@ -183,4 +194,62 @@ canal.mq.partition=0
 
 3. 提前创建 kafka topic 当然也可以通过 `canal-deployer` 启动后自动创建
 4. 启动 `canal-deployer`
+5. 改动数据后检查 kafka 是否存在 message
+```
+kafka-console-consumer.sh --bootstrap-server hadoop1:9092 --topic console_mysql_binlog_gmall --from-beginning
+```
+
+## [推荐]maxwell -> kafka
+既然选择使用 `kafka` 类似的 `MQ中间件` 作为数据的中间环节 那么还可以尝试使用 `maxwell` 替代 `canal-deployer` 达到同样的效果
+
+Maxwell是一个读取MySql binlog并将行更新作为JSON写入Kafka,Kinesis或其他流媒体平台的应用程序。Maxwell的操作开销很低，只需要mysql和写入的地方,其常见用例包括ETL，缓存构建/到期，度量收集，搜索索引和服务间通信。
+
+## 架构
+maxwell 从 mysql-binlog 到 kafka 的架构与canal相同
+
+<p align="center">
+    <img src="./img/mysql-maxwell-kafka.png" alt="mysql-maxwell-kafka"/>
+</p>
+
+1. maxwell 安装 解压
+maxwell-1.37.7 至少需要 jdk11 版本
+
+2. mysql 创建 maxwell 用户
+```sql
+CREATE USER 'maxwell' IDENTIFIED BY 'maxwell';
+GRANT ALL ON maxwell.* TO 'maxwell'@'%';
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'maxwell'@'%';
+FLUSH PRIVILEGES;
+```
+
+3. 尝试使用
+```bash
+# 将 binlog 日志输出到 stdout
+bin/maxwell --user='maxwell' --password='maxwell' --host='console' --producer=stdout
+```
+
+4. 结合kafka
+[Reference](https://maxwells-daemon.io/config/#kafka-producer)
+
+```bash
+# 先创建 topic
+/opt/module/kafka/bin/kafka-topics.sh --bootstrap-server hadoop1:9092 \
+--create --topic console_mysql_binlog_maxwell \
+--partitions 2 --replication-factor 2
+
+# 将 binlog filter(仅 gmalls 和 t1 数据库下的所有表)日志输出到 kafka
+JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
+--user='maxwell' --password='maxwell' --host='console' \
+--filter='exclude: *.*, include: gmall.*, include: t1.*' \
+--producer=kafka --producer_partition_by=database \
+--kafka.bootstrap.servers=hadoop1:9092 \
+--kafka_topic=console_mysql_binlog_maxwell &
+
+# # 为 topic 修改 replication-factor
+# ./kafka-topics.sh --bootstrap-server hadoop1:9092 \ 
+# --alter --topic console_mysql_binlog_maxwell \ 
+# --replication-factor 2
+```
+
+总结: maxwell 功能单一 仅考虑将 mysql-binlog 投递到 kafka/kinesis 但他的配置相当简单且兼容 mysql8.0 推荐使用
 
