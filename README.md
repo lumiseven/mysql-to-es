@@ -69,24 +69,118 @@ MQ：
 
 ## 前置准备
 1. Mysql-8.0 ES-8.3 安装完成 [mysql-es-setup](./prepare/mysql-es-setup.md) 
-2. mysql开启 binlog 功能(*) 并且 指定了有权限的用户 [mysql-binlog](./prepare/mysql-binlog.md)
+2. mysql开启 binlog 功能(\*) 并且 指定了有权限的用户 [mysql-binlog](./prepare/mysql-binlog.md)
 3. 创建相关的数据 mysql 的 库表 和 es 的 index mapping
-4. kafka(*) 已经安装完成
-5. spark、flink(*)
+4. kafka(\*) 已经安装完成
+5. spark(\*) flink(\*)
 
-## 使用 Canal 将 Mysql 数据同步到 ES 
+## [不推荐] 使用 Canal 将 Mysql 数据同步到 ES
 Canal 作为阿里开源的数据同步工具，基于 binlog 将数据库同步到其他各类数据库中，目标数据库支持mysql,postgresql,oracle,redis,MQ,ES等
 当前的 canal 支持源端 MySQL 版本包括 5.1.x , 5.5.x , 5.6.x , 5.7.x , 8.0.x
+官方简介: [canal-introduction](https://github.com/alibaba/canal/wiki/Introduction)
 
 ![canal1](./img/canal1.png)
 
 这里我们使用 `1.1.6`(2022-05-24) release版本的 canal 执行下面的操作
 
 ### 架构图
+canal 中各个组件的定义:
+>canal-admin
+>canal-admin设计上是为canal提供整体配置管理、节点运维等面向运维的功能，提供相对友好的WebUI操作界面，方便更多用户快速和安全的操作
+>[canal-admin](https://github.com/alibaba/canal/wiki/Canal-Admin-Guide)
+>
+>canal-adapter
+>增加客户端数据落地的适配及启动功能(支持HBase等)
+>[canal-adapter](https://github.com/alibaba/canal/wiki/ClientAdapter)
+>
+>canal-deployer
+>这个就相当于canal的服务端，启动它才可以在客户端接收数据库变更信息。
+>[canal-deployer](https://github.com/alibaba/canal/wiki/QuickStart)
+
 既然使用 canal 作为数据传输工具 且 canal 有能力直接将数据放入es中，则考虑使用架构:
 
 ![mysql-canal-es](./img/mysql-canal-es.png)
 
+### 集群机器分配说明
+[service](./config/service.md)
+
 不通过 mq 直接将数据从 mysql 放入 es
 ### 实际操作
-1. canal 安装
+1. canal 安装 解压
+```bash
+wget https://github.com/alibaba/canal/releases/download/canal-1.1.6/canal.deployer-1.1.6.tar.gz
+wget https://github.com/alibaba/canal/releases/download/canal-1.1.6/canal.admin-1.1.6.tar.gz
+wget https://github.com/alibaba/canal/releases/download/canal-1.1.6/canal.adapter-1.1.6.tar.gz
+```
+
+2. mysql 创建 canal 用户
+```sql
+CREATE USER 'canal' IDENTIFIED BY 'canal';
+GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
+FLUSH PRIVILEGES;
+```
+
+3. mysql 依赖修改
+canal 的 lib 中仅有 mysql5 的驱动 需要添加 mysql8的驱动
+
+4. 修改配置参见配置文件夹 [config/canal](./config/canal/readme.md)
+
+5. 启动/停止 canal-deployer
+```bash
+# 启动
+./deployer/bin/startup.sh
+
+# 停止
+./deployer/bin/stop.sh
+```
+
+6. (可选) `deployer` 成功启动后 就可以通过tcp连接 `deployer` 服务器 通过 `canal-client` 的api获取数据
+canal-client-demo: https://code.aliyun.com/lumiseven/canal-t1.git
+
+7. 配置 canal-adapter
+通过 `adapter` 对接 `es` 数据源
+```bash
+# 启动
+./adapter/bin/startup.sh
+
+# 停止
+./adapter/bin/stop.sh
+```
+
+8. 使用体验(canal 1.1.6)
+    1. 文档旧 bug多 需要稍微了解源代码才能使用 否则报错原因都不知道 项目结构和架构相对于功能来说增加了无用的复杂
+    2. `es8+` 需要配置 `es7` api 可以达到同样效果 各个配置没有说明需要自己尝试
+    3. 系统分为 deployer adapter admin(web-ui 控制台就不考虑了)， 其中 deployer 为核心 可以单独拆分 后端服务支持 tcp/kafka; adapter可以对接es hbase kylin mysql 但配置总体相对复杂且文档中配置过老需要摸索或者查看源码，且可靠性无法保证
+    4. **对 mysql8+ 的支持很糟糕** 虽然可以手动加入 jar 但是 deployer 使用一段时间后 `...unrecognized binlog event Unknown type:xx...` 应该是mysql版本新增type不支持造成的。再长时间后还会出现 position 严重超过实际值的情况，发生之后不 修改/重置position(1.删除 conf 中的 meta.dat 2.删除logs 中的 meta.log) 的话无法使用
+    5. 仅尝试了 `mysql-binlog -> deployer -> adapter -> es` 和 `mysql-binlog -> deployer -> tcp自定义代码` 两种使用方式 太费时间
+    6. es 的 adapter 当前似乎无法使用覆盖的方式提交数据，所以需要存在 全量同步+增量同步 两套方案
+    <!-- 6. 总的来说 单单deployer 可以考虑使用，adapter不考虑使用 通过deployer将数据投递到kafka或许是canal的解决方案中唯一靠谱的 -->
+
+### canal -> kafka
+不使用 `canal-adapter` 转而通过 `canal-deployer` 将数据投递到 `kafka`
+减少配置以及不稳定性，提高了项目复杂度，但是相比 adapter 扩展性增强
+
+[mysql-canal-kafka](./img/mysql-canal-kafka.png)
+1. 修改 `canal-deployer` 配置
+```properties
+...
+canal.serverMode=kafka
+...
+kafka.bootstrap.servers = 127.0.0.1:9092
+...
+```
+
+2. 修改 `instance.properties` 配置
+```
+...
+# 默认使用 console_mysql_binlog topic存放
+canal.mq.topic=console_mysql_binlog
+
+# gmall 库的所有表放入 console_mysql_binlog_gmall topic
+canal.mq.dynamicTopic=console_mysql_binlog_gmall:gmall
+canal.mq.partition=0
+```
+
+3. 提前创建 kafka topic 当然也可以通过 `canal-deployer` 启动后自动创建
+4. 启动 `canal-deployer`
+
