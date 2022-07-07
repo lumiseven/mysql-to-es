@@ -253,3 +253,103 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 
 总结: maxwell 功能单一 仅考虑将 mysql-binlog 投递到 kafka/kinesis 但他的配置相当简单且兼容 mysql8.0 推荐使用
 
+## kafka -> es
+将 kafka 中的数据放入 es 中，但是由于 topic 中存放的是 binlog 的 json 形式，数据中存在逻辑，不能直接同步到 es
+以 maxwell 获取到的数据举例 数据格式如下: 
+
+新增:
+```json
+{
+	"database": "t1",
+	"table": "msg_box",
+	"type": "insert",
+	"ts": 1657114850,
+	"xid": 63203,
+	"commit": true,
+	"data": {
+		"id": 39,
+		"bu_site": 2,
+		"push_type": 2,
+		"channel": 0,
+		"box_type": 5,
+		"box_name": "个人公告",
+		"image_url": "imageUrl",
+		"notice_switch": 0,
+		"show_switch": 1,
+		"extend_data": "可选择的json拓展参数",
+		"create_time": "2022-07-06 21:40:50",
+		"update_time": null,
+		"is_deleted": 0
+	}
+}
+```
+
+修改:
+```json
+{
+	"database": "t1",
+	"table": "msg_box",
+	"type": "update",
+	"ts": 1657114685,
+	"xid": 61104,
+	"commit": true,
+	"data": {
+		"id": 38,
+		"bu_site": 2,
+		"push_type": 2,
+		"channel": 0,
+		"box_type": 5,
+		"box_name": "个人公告",
+		"image_url": "imageUrl3",
+		"notice_switch": 0,
+		"show_switch": 1,
+		"extend_data": "可选择的json拓展参数",
+		"create_time": "2022-07-06 00:07:22",
+		"update_time": null,
+		"is_deleted": 0
+	},
+	"old": {
+		"image_url": "imageUrl"
+	}
+}
+```
+
+删除:
+```json
+{
+	"database": "t1",
+	"table": "msg_box",
+	"type": "delete",
+	"ts": 1657114765,
+	"xid": 61983,
+	"commit": true,
+	"data": {
+		"id": 38,
+		"bu_site": 2,
+		"push_type": 2,
+		"channel": 0,
+		"box_type": 5,
+		"box_name": "个人公告",
+		"image_url": "imageUrl3",
+		"notice_switch": 0,
+		"show_switch": 1,
+		"extend_data": "可选择的json拓展参数",
+		"create_time": "2022-07-06 00:07:22",
+		"update_time": null,
+		"is_deleted": 0
+	}
+}
+```
+
+可以得出
+1. 新增修改可以同时使用覆盖操作
+2. 需要提前定义 database+table 与 es index 的关系
+
+### flink 或者 spark-streaming 将数据从 kafka 存入 es
+
+TODO
+
+## Flink-CDC
+Flink社区开发了 flink-cdc-connectors 组件，这是一个可以直接从 MySQL、PostgreSQL 等数据库直接读取全量数据和增量变更数据的 source 组件。
+目前也已开源，开源地址：https://github.com/ververica/flink-cdc-connectors
+flink-cdc 中内置了 Debezium 作为 mysql-binlog 的获取工具
