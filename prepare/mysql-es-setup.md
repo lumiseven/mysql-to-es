@@ -41,7 +41,7 @@ cluster.name: cluster-es-1
 node.name: es-0
 #ip 地址,每个节点的地址不能重复
 network.host: hadoop0
-#是不是有资格主节点 es8使用 node.roles
+#是不是有资格成为主节点 es8使用 node.roles
 # node.master: true
 # node.data: true
 node.roles: [ master, data ]
@@ -54,11 +54,13 @@ http.max_content_length: 200mb
 cluster.initial_master_nodes: ["es-2"]
 #es7.x 之后新增的配置,节点发现
 discovery.seed_hosts: ["hadoop0:9300","hadoop1:9300","hadoop2:9300"]
-# gateway.recover_after_nodes: 2 es8 使用 gateway.recover_after_data_nodes
+# gateway.recover_after_nodes: 2
+# es8 使用 gateway.recover_after_data_nodes
 gateway.recover_after_data_nodes: 2
 network.tcp.keep_alive: true
 network.tcp.no_delay: true
-# transport.tcp.compress: true # es8使用 transport.compress
+# transport.tcp.compress: true
+# es8使用 transport.compress
 transport.compress: true
 #集群内同时启动的数据任务个数,默认是 2 个
 cluster.routing.allocation.cluster_concurrent_rebalance: 2
@@ -75,7 +77,7 @@ ingest.geoip.downloader.enabled: false
 可以选择配置jvm参数调整es占用资源多少
 ```bash
 ## 限制 es 内存2g
-echo $'-Xms2g\n-Xmx2g' > /opt/module/es/config/jvm.options.d/2gb.options
+echo $'-Xms1g\n-Xmx1g' > /opt/module/es/config/jvm.options.d/1gb.options
 ```
 
 配置系统资源使用上限，需要根据系统配置相关项:

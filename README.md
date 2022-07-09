@@ -345,7 +345,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 1. 新增修改可以同时使用覆盖操作
 2. 需要提前定义 database+table 与 es index 的关系
 
-### flink 或者 spark-streaming 将数据从 kafka 存入 es
+### flink 或者 spark-streaming 或者其他自定义 kafka-consumer 将数据从 kafka 存入 es
 
 TODO
 
@@ -353,3 +353,7 @@ TODO
 Flink社区开发了 flink-cdc-connectors 组件，这是一个可以直接从 MySQL、PostgreSQL 等数据库直接读取全量数据和增量变更数据的 source 组件。
 目前也已开源，开源地址：https://github.com/ververica/flink-cdc-connectors
 flink-cdc 中内置了 Debezium 作为 mysql-binlog 的获取工具
+
+### 通过flinkcdc 直接将数据从 mysql-binlog -> es
+DataStream 方式
+code: https://code.aliyun.com/lumiseven/flinkcdc3.git
