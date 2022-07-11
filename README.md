@@ -280,7 +280,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 	"commit": true,
 	"data": {
 		"id": 39,
-		...
+		// ...
 	}
 }
 ```
@@ -296,7 +296,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 	"commit": true,
 	"data": {
 		"id": 38,
-		...
+		// ...
 	},
 	"old": {
 		"image_url": "imageUrl"
@@ -315,7 +315,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 	"commit": true,
 	"data": {
 		"id": 38,
-		...
+		// ...
 	}
 }
 ```
