@@ -7,6 +7,7 @@
 而不同的数据同步策略又与业务存在很大的联系，此文给出从 RDBS(MYSQL)到ES(ElasticSearch) 的同步解决方案。
 比如最典型的例子，在电商系统总，商品实际的CURD操作在 RDBS 中，但是RDBS中的数据并不适和大量的执行检索操作(暂时不考虑mysql的全文检索功能)，故将商品的检索信息放入ES中执行是一个中大型电商系统的基本操作。
 
+---
 
 ## 方案思考
 当前做数据同步的方案不止一个，在实际操作之前需要思考哪种方案适合实际的需求
@@ -54,6 +55,7 @@
 
 关于同步策略的总结：1. 流处理 批处理 根据以上业务选择 2. 是否启用MQ可以考虑整个系统，如果仅仅考虑mysql到es的数据同步业务，则不需要使用
 
+---
 
 ## 相关工具及选择
 由于同步操作涵盖业务广，故而很多CDC工具也能完成相关操作。在此可以先列举一部分需要使用到的工具
@@ -71,12 +73,16 @@ MQ：
 1. MQ 中 `Kafka` 对其他各个组件的支持较为简单且已有稳定支持 优先考虑
 2. 数据同步工具各有优劣 考虑使用几种方案各进行尝试
 
+---
+
 ## 前置准备
 1. Mysql-8.0 ES-8.3 安装完成 [mysql-es-setup](./prepare/mysql-es-setup.md) 
 2. mysql开启 binlog 功能(\*) 并且 指定了有权限的用户 [mysql-binlog](./prepare/mysql-binlog.md)
 3. 创建相关的数据 mysql 的 库表 和 es 的 index mapping
 4. kafka(\*) 已经安装完成
 5. spark(\*) flink(\*)
+
+---
 
 ## [不推荐] 使用 Canal 将 Mysql 数据同步到 ES
 Canal 作为阿里开源的数据同步工具，基于 binlog 将数据库同步到其他各类数据库中，目标数据库支持mysql,postgresql,oracle,redis,MQ,ES等
@@ -199,10 +205,14 @@ canal.mq.partition=0
 kafka-console-consumer.sh --bootstrap-server hadoop1:9092 --topic console_mysql_binlog_gmall --from-beginning
 ```
 
+---
+
 ## [推荐]maxwell -> kafka
 既然选择使用 `kafka` 类似的 `MQ中间件` 作为数据的中间环节 那么还可以尝试使用 `maxwell` 替代 `canal-deployer` 达到同样的效果
 
 Maxwell是一个读取MySql binlog并将行更新作为JSON写入Kafka,Kinesis或其他流媒体平台的应用程序。Maxwell的操作开销很低，只需要mysql和写入的地方,其常见用例包括ETL，缓存构建/到期，度量收集，搜索索引和服务间通信。
+
+---
 
 ## 架构
 maxwell 从 mysql-binlog 到 kafka 的架构与canal相同
@@ -253,6 +263,8 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 
 总结: maxwell 功能单一 仅考虑将 mysql-binlog 投递到 kafka/kinesis 但他的配置相当简单且兼容 mysql8.0 推荐使用
 
+---
+
 ## kafka -> es
 将 kafka 中的数据放入 es 中，但是由于 topic 中存放的是 binlog 的 json 形式，数据中存在逻辑，不能直接同步到 es
 以 maxwell 获取到的数据举例 数据格式如下: 
@@ -268,18 +280,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 	"commit": true,
 	"data": {
 		"id": 39,
-		"bu_site": 2,
-		"push_type": 2,
-		"channel": 0,
-		"box_type": 5,
-		"box_name": "个人公告",
-		"image_url": "imageUrl",
-		"notice_switch": 0,
-		"show_switch": 1,
-		"extend_data": "可选择的json拓展参数",
-		"create_time": "2022-07-06 21:40:50",
-		"update_time": null,
-		"is_deleted": 0
+		...
 	}
 }
 ```
@@ -295,18 +296,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 	"commit": true,
 	"data": {
 		"id": 38,
-		"bu_site": 2,
-		"push_type": 2,
-		"channel": 0,
-		"box_type": 5,
-		"box_name": "个人公告",
-		"image_url": "imageUrl3",
-		"notice_switch": 0,
-		"show_switch": 1,
-		"extend_data": "可选择的json拓展参数",
-		"create_time": "2022-07-06 00:07:22",
-		"update_time": null,
-		"is_deleted": 0
+		...
 	},
 	"old": {
 		"image_url": "imageUrl"
@@ -325,18 +315,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 	"commit": true,
 	"data": {
 		"id": 38,
-		"bu_site": 2,
-		"push_type": 2,
-		"channel": 0,
-		"box_type": 5,
-		"box_name": "个人公告",
-		"image_url": "imageUrl3",
-		"notice_switch": 0,
-		"show_switch": 1,
-		"extend_data": "可选择的json拓展参数",
-		"create_time": "2022-07-06 00:07:22",
-		"update_time": null,
-		"is_deleted": 0
+		...
 	}
 }
 ```
@@ -347,16 +326,26 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 
 ### Flink 或者 Spark-streaming Spark-structured-streaming 或者 Logstash 或者其他自定义 kafka-consumer 将数据从 kafka 存入 es
 
-[**单个已知 schema 的情况合适， 动态 schema 的情况不合适 每个 schema 需要单个定义**] 
-`spark-structured-streaming`: https://code.aliyun.com/lumiseven/sparkss6/blob/master/src/main/scala/code/lumiseven/test/StructuredStreamingKafkaToES.scala
+| | flink | spark |
+| -- | -- | -- |
+| version | 1.13.6 | 3.2.1 |
 
-[**适合**]
-`spark-streaming`: https://code.aliyun.com/lumiseven/sparkss6/blob/master/src/main/scala/code/lumiseven/test/SparkStreamingKafkaToES.scala
+#### spark-structured-streaming
+>**单个已知 schema 的情况合适， 动态 schema 的情况不合适 每个 schema 需要单个定义**
+>code: https://code.aliyun.com/lumiseven/sparkss6/blob/master/src/main/scala/code/lumiseven/test/StructuredStreamingKafkaToES.scala
 
-`flink`: TODO
+#### spark-streaming
+>**适合**
+>code: https://code.aliyun.com/lumiseven/sparkss6/blob/master/src/main/scala/code/lumiseven/test/SparkStreamingKafkaToES.scala
+
+#### flink
+>适合数据已经再 kafka 中存在 需要放入 es 的情况 该情况与直接使用 flinkcdc 代码相同 如果不是由于数据在 kafka 应该考虑直接使用 flinkcdc 提供的解决方案
+>code: https://code.aliyun.com/lumiseven/flinkcdc3/blob/master/src/main/scala/code/lumiseven/test/KafkaToES.scala
 
 #### Logstash
 logstash 作为与 es 同为 elastic 产品 同样能将数据从 kafka 直接导入到 es 中; 但是如果需要执行 ETL 的操作(比如 maxwell 放入 kafka 中的数据需要再操作) 则显得过于繁琐
+
+---
 
 ## [推荐] Flink-CDC
 Flink社区开发了 flink-cdc-connectors 组件，这是一个可以直接从 MySQL、PostgreSQL 等数据库直接读取全量数据和增量变更数据的 source 组件。
