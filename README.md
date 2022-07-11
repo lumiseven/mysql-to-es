@@ -345,19 +345,26 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 1. 新增修改可以同时使用覆盖操作
 2. 需要提前定义 database+table 与 es index 的关系
 
-### flink 或者 spark-streaming 或者 logstash 或者其他自定义 kafka-consumer 将数据从 kafka 存入 es
+### Flink 或者 Spark-streaming Spark-structured-streaming 或者 Logstash 或者其他自定义 kafka-consumer 将数据从 kafka 存入 es
 
-[不适合 schema 需要单个定义] `spark-structured-streaming`: https://code.aliyun.com/lumiseven/sparkss6.git
+[**单个已知 schema 的情况合适， 动态 schema 的情况不合适 每个 schema 需要单个定义**] 
+`spark-structured-streaming`: https://code.aliyun.com/lumiseven/sparkss6/blob/master/src/main/scala/code/lumiseven/test/StructuredStreamingKafkaToES.scala
+
+[**适合**]
+`spark-streaming`: https://code.aliyun.com/lumiseven/sparkss6/blob/master/src/main/scala/code/lumiseven/test/SparkStreamingKafkaToES.scala
+
+`flink`: TODO
 
 #### Logstash
-TODO
+logstash 作为与 es 同为 elastic 产品 同样能将数据从 kafka 直接导入到 es 中; 但是如果需要执行 ETL 的操作(比如 maxwell 放入 kafka 中的数据需要再操作) 则显得过于繁琐
 
-## [推荐]Flink-CDC
+## [推荐] Flink-CDC
 Flink社区开发了 flink-cdc-connectors 组件，这是一个可以直接从 MySQL、PostgreSQL 等数据库直接读取全量数据和增量变更数据的 source 组件。
 目前也已开源，开源地址：https://github.com/ververica/flink-cdc-connectors
 flink-cdc 中内置了 Debezium 作为 mysql-binlog 的获取工具
 
 ### 通过flinkcdc 直接将数据从 mysql-binlog -> es
-`DataStream` 方式
-code: https://code.aliyun.com/lumiseven/flinkcdc3.git
+[**推荐**]
+`DataStream` 方式 说明详见 code: https://code.aliyun.com/lumiseven/flinkcdc3/blob/master/src/main/java/code/lumiseven/test/MysqlToElasticsearch1.java
 
+`TableAPI` 方式: TODO
