@@ -329,6 +329,7 @@ JAVA_HOME=/opt/module/jdk11 nohup /opt/module/maxwell/bin/maxwell \
 | | flink | spark |
 | -- | -- | -- |
 | version | 1.13.6 | 3.2.1 |
+| test-code | https://code.aliyun.com/lumiseven/flinkcdc3.git | https://code.aliyun.com/lumiseven/sparkss6.git |
 
 #### spark-structured-streaming
 >**单个已知 schema 的情况合适， 动态 schema 的情况不合适 每个 schema 需要单个定义**
@@ -353,7 +354,11 @@ Flink社区开发了 flink-cdc-connectors 组件，这是一个可以直接从 M
 flink-cdc 中内置了 Debezium 作为 mysql-binlog 的获取工具
 
 ### 通过flinkcdc 直接将数据从 mysql-binlog -> es
-[**推荐**]
-`DataStream` 方式 说明详见 code: https://code.aliyun.com/lumiseven/flinkcdc3/blob/master/src/main/java/code/lumiseven/test/MysqlToElasticsearch1.java
 
-`TableAPI` 方式: TODO
+直接将数据实时的从 mysql-binlog 直接放入 es 的方案能降低系统的复杂度 减少出现 bug 的排查成本
+
+[**推荐**]
+`DataStream` 方式 详见 code: https://code.aliyun.com/lumiseven/flinkcdc3/blob/master/src/main/java/code/lumiseven/test/MysqlToElasticsearch1.java
+
+[**单表单index情况推荐**]
+`TableAPI` 方式: 详见 code: https://code.aliyun.com/lumiseven/flinkcdc3/blob/master/src/main/java/code/lumiseven/test/MysqlToElasticsearch2FlinkSQL.java
