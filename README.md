@@ -1,4 +1,4 @@
-# MYSQL -> ES 数据同步
+# MYSQL(RDBS) -> ES 数据同步 (包含基于CDC的通用方案)
 
 
 ## 简介
